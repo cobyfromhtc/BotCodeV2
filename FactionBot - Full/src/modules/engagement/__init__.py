@@ -12,7 +12,7 @@ _MEMBERS = ("giveaways", "invites", "leveling", "polls",)
 
 def __getattr__(name: str):
     if name in _MEMBERS:
-        mod = importlib.import_module(f"modules.engagement.verification")
+        mod = importlib.import_module(f"modules.engagement.{name}")
         globals()[name] = mod
         return mod
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -12,6 +12,53 @@ The two editions carry independent version lines and are versioned together
 when they change together: Short is on the 5.x line, Full on the 4.x line.
 Entries below apply to both editions unless the heading names one.
 
+## [5.2.1 / 4.2.1] — 2026-09-19
+
+Full "Round 6.1" — `!regenerateinvites` reliability fix (the command could
+appear permanently stuck on "🔄 Regenerating Invites"), plus a latent
+lazy-import defect shared by both editions.
+
+### Fixed — Full (`modules/engagement/invites.py`)
+
+- **`!regenerateinvites` "stuck" fix.** The delete phase ran one
+  rate-limited HTTP delete per invite with no progress feedback and no
+  logging on success, so a guild with an accumulated backlog of bot-created
+  invites showed a frozen progress embed for minutes. The delete loop now
+  (a) shows a live counter — `⏳ Deleting old invite links… (X/Y)` —
+  refreshed at most every 3 s, (b) deletes in bounded 5-invite concurrent
+  chunks (~5× faster through backlogs), and (c) reports a final
+  `Deleted X/Y` line before minting the new batch.
+- **Root cause of the backlog: `regenerate_expired` (the 5-minute auto
+  task) minted replacement batches but never deleted the replaced invites
+  from Discord**, so live bot invites accumulated without bound (the
+  live DB already tracked 8 batches / 24 codes). It now deletes the
+  replaced codes Discord-side (best-effort, non-fatal), archives only
+  after minting succeeds (a broken mint no longer re-archives the same
+  dead batch every cycle), and prunes the tracked set to a 24-entry cap
+  (Discord's 25-field embed limit; oldest expired entries first).
+- **Frozen-embed failure modes.** `progress_msg.edit`, `channel.create_invite`
+  and `update_invite_message`'s `fetch_message` had gaps where a single
+  HTTP failure (message deleted, invite-cap 400, lost Read Message
+  History) killed the coroutine mid-run and left the embed frozen forever.
+  All progress updates are now best-effort with a fresh-message fallback,
+  `create_invite` skips failing channels with a per-channel warning, and
+  the whole command is wrapped so any unexpected error ends as
+  `❌ Regeneration failed: …` on the embed plus a logged traceback.
+- **Check-task efficiency.** `check_and_update_all` fetched the entire
+  guild invite list once per tracked code (24 codes = 24 full fetches per
+  5-minute cycle); it now fetches once per cycle and passes the list down.
+  A failed fetch skips the cycle instead of marking every invite expired.
+
+### Fixed — both editions
+
+- `modules/<domain>/__init__.py` lazy loaders hardcoded
+  `modules.<domain>.verification` instead of `modules.<domain>.{name}` in
+  all 12 non-placeholder domain packages, so any `from modules.engagement
+  import invites`-style import raised `ModuleNotFoundError`. The bot itself
+  imported submodules via `importlib.import_module` (which bypasses the
+  package `__getattr__`) and never hit it — but the defect broke tooling
+  and any future direct imports.
+
 ## [5.2.0 / 4.2.0] — 2026-09-19
 
 Short "Round 9" / Full "Round 6" — FactionAccess: multi-guild licensing,
