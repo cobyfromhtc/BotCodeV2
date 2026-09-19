@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from typing import Dict, Optional
 
 from core.state import config, data_manager
+from core import state  # runtime-only access to state.faction_access (per-guild identity)
 from core.helpers import brand_text, xp_for_level, xp_for_next_level
 
 
@@ -72,16 +73,47 @@ class EmbedBuilder:
     def branded(base_embed: discord.Embed, guild_id: Optional[int]) -> discord.Embed:
         """Apply per-guild custom branding (footer / color / thumbnail / image)
         to an existing embed. Falls back gracefully if no branding is configured
-        or the data manager isn't ready yet (called very early in startup)."""
+        or the data manager isn't ready yet (called very early in startup).
+
+        FactionAccess integration: when the guild carries a faction identity
+        override (an allied faction's own tag and name), [GANG NAME] /
+        [GANG ABBR] tokens in the footer resolve to THAT guild's names, and
+        otherwise-unbranded embeds get the default
+        "FactionBot • <that guild's gang name>" footer. The home faction keeps
+        its exact pre-FactionAccess appearance (resolve falls back to the
+        global config values there)."""
         try:
             if data_manager is None or data_manager._connection is None:
                 return base_embed
             if guild_id is None:
                 return base_embed
+            # Per-guild faction identity — resolved through core.state so the
+            # layering rule holds (utils never imports packages directly).
+            faction = getattr(state, 'faction_access', None)
+            gang_name = config.gang_name
+            has_identity_override = False
+            if faction is not None:
+                try:
+                    identity = faction.identity_for(guild_id)
+                    gang_name = identity.gang_name or gang_name
+                    has_identity_override = identity.is_override
+                except Exception:
+                    pass
             branding = data_manager.get_branding(guild_id)
             footer = branding.get('embed_footer')
             if footer:
-                base_embed.set_footer(text=brand_text(footer))
+                if faction is not None:
+                    # Per-guild substitution (legacy tokens + placeholders).
+                    try:
+                        base_embed.set_footer(text=faction.resolve_text(footer, guild_id))
+                    except Exception:
+                        base_embed.set_footer(text=brand_text(footer))
+                else:
+                    base_embed.set_footer(text=brand_text(footer))
+            elif has_identity_override:
+                # Allied guild with an identity but no custom footer: still
+                # present as its own faction instead of going unbranded.
+                base_embed.set_footer(text=f"FactionBot • {gang_name}")
             color = branding.get('embed_color')
             if isinstance(color, int):
                 base_embed.colour = discord.Color(color)

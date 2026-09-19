@@ -6,6 +6,7 @@ All @bot.event handlers are installed via register_events(bot)."""
 # stdlib + discord.py
 from packages import reactionroles as ReactionRoles
 from packages import tickettool as TicketTool
+from packages import faction_access as FactionAccess
 import asyncio
 import copy
 import discord
@@ -308,6 +309,17 @@ def register_events(bot: commands.Bot) -> None:
         # -----------------------------------------------------------------------
         _on_ready_initialized = True
 
+        # --- FACTIONACCESS ON_READY HOOK ---
+        # Classifies every command into its feature bundle, adopts the home
+        # guild when no explicit setting exists, registers pre-existing
+        # guilds as pending, applies per-guild identity nicknames and starts
+        # the license-expiry sweeper. Must run BEFORE any command can be
+        # answered in an allied guild.
+        try:
+            FactionAccess.wiring.on_ready_hook(bot)
+        except Exception as exc:
+            logging.exception(f"[on_ready] FactionAccess.on_ready_hook failed: {exc}")
+
         if _is_lead_instance() and ows_get("first_startup_tutorial"):
             await send_owner_tutorial(force=False)
         else:
@@ -531,6 +543,17 @@ def register_events(bot: commands.Bot) -> None:
 
     @bot.event
     async def on_member_join(member: discord.Member) -> None:
+        # --- FACTIONACCESS AUTOMATION SCOPE ---
+        # Automated join behaviors (blacklist auto-ban, welcome message,
+        # sticky-role restore) are bound to the home faction's global
+        # channel/role config, so they stay HOME-GUILD-ONLY in the
+        # multi-guild model. Allied factions get the systems they were
+        # granted via commands (which carry their own per-guild config),
+        # never unsolicited home-config automation.
+        _fa = getattr(state, 'faction_access', None)
+        if _fa is not None and not _fa.is_home(member.guild.id):
+            return
+
         # Domain split: moderation bots handle the blacklist auto-ban; utility
         # bots handle welcome messages + sticky roles. (Full bot: both.)
         if instance_handles('mod'):
@@ -554,7 +577,16 @@ def register_events(bot: commands.Bot) -> None:
                 
                     rules_channel = bot.get_channel(config.channels.rules)
                     if rules_channel:
-                        embed.add_field(name="Server Rules", value=f"Make sure to follow {config.gang_name}'s rules {rules_channel.mention}", inline=False)
+                        # Per-guild gang identity: the home faction may carry an
+                        # identity override too, so resolve through the service
+                        # when it is available (falls back to the global config).
+                        gang_display = config.gang_name
+                        try:
+                            if _fa is not None:
+                                gang_display = _fa.gang_name_for(member.guild.id) or gang_display
+                        except Exception:
+                            pass
+                        embed.add_field(name="Server Rules", value=f"Make sure to follow {gang_display}'s rules {rules_channel.mention}", inline=False)
                 
                     embed.set_footer(text=f"Joined on {member.joined_at.strftime('%Y-%m-%d')}")
                 
@@ -583,6 +615,12 @@ def register_events(bot: commands.Bot) -> None:
             return
         if after.bot:
             return
+        # --- FACTIONACCESS AUTOMATION SCOPE ---
+        # The blacklist presence scan uses the home faction's global keyword
+        # list — it never extends into allied guilds.
+        _fa = getattr(state, 'faction_access', None)
+        if _fa is not None and not _fa.is_home(after.guild.id):
+            return
         if not state.blacklisted_keywords:
             return
     
@@ -598,6 +636,22 @@ def register_events(bot: commands.Bot) -> None:
     async def on_message(message: discord.Message) -> None:
         if message.author.bot:
             return
+
+        # --- FACTIONACCESS AUTOMATION SCOPE ---
+        # Non-command automations must respect multi-guild licensing:
+        #   * home-guild-only automations (blacklist scans, message-log
+        #     caching, premium custom-command dispatch) — they read the
+        #     home faction's global config;
+        #   * bundle-following automations (leveling XP) — the data is
+        #     per-guild, so they run wherever the bundle is granted.
+        # A missing service (pre-setup_hook) keeps the legacy behavior.
+        _fa = getattr(state, 'faction_access', None)
+        _fa_home = (_fa is None or message.guild is None
+                    or _fa.automation_allowed(message.guild.id, None))
+        _fa_leveling = (_fa is None or message.guild is None
+                        or _fa.automation_allowed(message.guild.id, 'leveling'))
+        _fa_tickets = (_fa is None or message.guild is None
+                       or _fa.automation_allowed(message.guild.id, 'tickets'))
 
         # --- VERIFICATION CHANNEL AUTO-PURGE HOOK ---
         # Any human message in the verification channel counts as activity: it
@@ -632,7 +686,8 @@ def register_events(bot: commands.Bot) -> None:
         # channels, where staff would otherwise be auto-banned for discussing a
         # blacklisted keyword.
         _ticket_exempt = any_ticket is not None and not ows_get("blacklist_in_tickets")
-        if instance_handles('mod') and message.guild and state.blacklisted_keywords and not _ticket_exempt and ows_get("auto_ban_message"):
+        if (instance_handles('mod') and message.guild and state.blacklisted_keywords
+                and not _ticket_exempt and ows_get("auto_ban_message") and _fa_home):
             content = message.content or ""
             if not content.startswith(config.command_prefix):
                 found, keyword = check_text_for_keywords(content)
@@ -679,11 +734,11 @@ def register_events(bot: commands.Bot) -> None:
                                 logging.error(f"[Blacklist] HTTP error banning {author}: {e}")
                     return
 
-        if instance_handles('utility'):
+        if instance_handles('utility') and _fa_leveling:
             await process_leveling(message)
 
         try:
-            if instance_handles('mod') and message.guild is not None:
+            if instance_handles('mod') and message.guild is not None and _fa_home:
                 MessageLogSystem.cache(message)
         except Exception as exc:
             logging.debug(f"[MsgLog] on_message cache failed: {exc}")
@@ -781,7 +836,7 @@ def register_events(bot: commands.Bot) -> None:
         # --- PREMIUM TIER 2: custom command prefix dispatch ---
         # If the message is a !-prefixed command that isn't a built-in, check if
         # it's a custom command. If it ran, we're done (skip multi-command parsing).
-        if instance_handles('ticket') and PREMIUM_AVAILABLE and message.guild and message.content:
+        if instance_handles('ticket') and PREMIUM_AVAILABLE and message.guild and message.content and _fa_tickets:
             try:
                 content = message.content.strip()
                 if content.startswith(config.command_prefix):

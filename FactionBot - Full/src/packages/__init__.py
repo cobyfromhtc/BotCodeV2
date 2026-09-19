@@ -1,21 +1,25 @@
 # -*- coding: utf-8 -*-
-"""FactionBot feature packages — the two bundled premium suites.
+"""FactionBot feature packages — the bundled premium + platform suites.
 
-    packages/tickettool/     premium ticket system (26 modules)
-    packages/reactionroles/  reaction roles (5 modules)
+    packages/tickettool/      premium ticket system (26 modules)
+    packages/reactionroles/   reaction roles (5 modules)
+    packages/faction_access/  multi-guild licensing + identity + gating (8 modules)
 
-Contract (identical for both)::
+Contract (identical for all three)::
 
     package.commands.register(bot)          prefix command registration
     package.wiring.on_setup_hook(dm, bot)   schema install (idempotent)
     package.wiring.on_*                    runtime event hooks
 
-Both packages keep their internal imports relative, so they can be lifted
-out of ``src/packages/`` as standalone drop-ins.
+Both premium packages keep their internal imports relative, so they can be
+lifted out of ``src/packages/`` as standalone drop-ins. faction_access adds
+two hooks beyond that contract — ``gating.install(bot)`` (global command
+gate) and ``wiring.register_events(bot)`` / ``wiring.on_ready_hook(bot)`` —
+which Bot.py calls at the documented lifecycle points.
 """
 import importlib
 
-_PACKAGES = ("tickettool", "reactionroles")
+_PACKAGES = ("tickettool", "reactionroles", "faction_access")
 
 
 def __getattr__(name: str):

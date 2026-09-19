@@ -94,7 +94,7 @@ def register(bot):
     )
     @commands.has_permissions(manage_channels=True)
     @app_commands.describe(
-        panel_id="Panel ID (use /panels to list)",
+        panel_id="Panel ID (use !panels to list)",
         open_template="Open-ticket name template, e.g. support-{ticket.count}-{ticket.user}",
         closed_template="Closed-ticket name template (optional)",
         claimed_template="Claimed-ticket name template (optional)",

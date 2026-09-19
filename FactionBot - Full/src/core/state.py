@@ -44,3 +44,8 @@ levels_data: Dict[Tuple[int, int], Dict] = {}  # (user_id, guild_id) -> level da
 bot: Optional[Any] = None
 # ticket engine instance — created in on_ready (needs guilds cached)
 ticket_tool: Optional[Any] = None
+# FactionAccess licensing service — created in setup_hook by
+# packages.faction_access.wiring.on_setup_hook. Lower layers (utils.ui.embeds,
+# runtime events) resolve per-guild faction identity through it via
+# ``getattr(state, 'faction_access', None)`` so layering stays intact.
+faction_access: Optional[Any] = None

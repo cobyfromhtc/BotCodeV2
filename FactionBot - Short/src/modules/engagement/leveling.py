@@ -319,6 +319,15 @@ class LevelingCog(commands.Cog, name="Leveling"):
         if member is None:
             return
 
+        # --- FACTIONACCESS AUTOMATION SCOPE ---
+        # Leveling data is keyed (user, guild), so XP follows the per-guild
+        # 'leveling' bundle: the home faction and explicitly granted allied
+        # factions earn XP; everyone else is skipped. A missing service
+        # (pre-setup_hook) keeps the legacy behavior.
+        faction = getattr(self.bot, 'faction_access', None)
+        if faction is not None and not faction.automation_allowed(message.guild.id, 'leveling'):
+            return
+
         content = message.content or ""
         prefix = self._command_prefix()
         if content.startswith(prefix):  # commands earn no XP

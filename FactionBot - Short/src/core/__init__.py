@@ -36,11 +36,14 @@ from config.settings import Config
 from core.data_manager import DataManager
 from core import state  # shared runtime singletons (see state.py docstring)
 
-# Aligned with CHANGELOG.md (Round 7 = the SaaS restructure).
-__version__ = "5.0.0"
+# Aligned with docs/CHANGELOG.md (Round 7 = the SaaS restructure,
+# Round 8 = the SaaS quality pass, Round 9 = FactionAccess multi-guild
+# licensing: !license / !request, per-guild identity, feature-bundle gating).
+EDITION = "Short"
+__version__ = "5.2.0"
 
 __all__ = [
-    "__version__", "state",
+    "__version__", "EDITION", "state",
     "_HERE", "_PROJECT_ROOT", "_SRC_ROOT", "_DATA_DIR",
     "get_bot_token", "is_placeholder_token", "load_local_env_file",
     "read_token_from_file",

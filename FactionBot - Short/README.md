@@ -26,7 +26,8 @@ ShortVersion/
 │   │   ├── moderation/      automod rules engine
 │   │   ├── support/         dynamic help system
 │   │   └── verification/    member verification flow
-│   ├── packages/         tickettool/ (26 modules) · reactionroles/ (5)
+│   ├── packages/         tickettool/ (26 modules) · reactionroles/ (5) ·
+│   │                     faction_access/ (8 — multi-guild licensing)
 │   ├── utils/            botkit (thread-cached SQLite + embed/perm helpers)
 │   ├── data/             bot_data.db · JsonData/ · logs/ · backups/ · legacy/
 │   └── assets/           emojis/ · images/ · templates/
@@ -41,9 +42,10 @@ ShortVersion/
 the singletons → `src/core/state.py`, token loading →
 `src/config/environment.py`, `botkit` → `src/utils/botkit.py`, the 7
 subsystem cogs → `src/modules/<domain>/`. `src/bot.py` keeps ONLY the
-application layer (13,158 lines) — verified with a **1:1 identical
+application layer (~13,400 lines) — verified with a **1:1 identical
 command registry** (143 top-level / 226 qualified / 0 slash, before and
-after).
+after; 145 / 245 today after the FactionAccess suite — `!license` group +
+`!request`, v5.2.0).
 
 ## What's inside
 
@@ -55,6 +57,7 @@ after).
 | 📈 Invites | Real join attribution (invite snapshots + vanity URLs), leaderboards, fake/bonus/left tracking, join announcements |
 | ⭐ Leveling | MEE6-style XP curve, anti-farming (cooldown + duplicate detection), level role rewards, DB-backed |
 | 🧩 Core | Reaction roles, sticky roles, warnings, temp mutes, message logging, welcome messages, custom commands, branding, OWS owner toggles, dynamic help, multi-command chaining |
+| 🛡️ Multi-guild licensing | FactionAccess package (8 modules, byte-identical with the Full edition) — `!license` suite + `!request`, per-guild feature bundles, per-guild gang identity + bot nickname, expiry, audit trail. Short's per-guild core systems make allied-guild deployment genuinely end-to-end (see docs/FEATURES.md readiness matrix) |
 
 ## Requirements
 - Python 3.10+

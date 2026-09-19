@@ -27,6 +27,7 @@ import discord
 from discord.ext import commands
 
 from utils import botkit  # relocated into utils/ by the SaaS restructure
+from core import EDITION, __version__
 
 log = logging.getLogger(__name__)
 
@@ -45,6 +46,7 @@ CATEGORY_REACTION = "🏷 Reaction Roles"
 CATEGORY_MODERATION = "🛡 Moderation"
 CATEGORY_ADMIN = "🛠 Setup & Admin"
 CATEGORY_SETUP = "🛠 Setup"
+CATEGORY_ACCESS = "🤝 Faction Access"
 CATEGORY_HELP = "❓ Help"
 CATEGORY_UTILITY = "⚙️ Utility & Misc"
 
@@ -59,6 +61,7 @@ ALL_CATEGORIES: List[str] = [
     CATEGORY_MODERATION,
     CATEGORY_ADMIN,
     CATEGORY_SETUP,
+    CATEGORY_ACCESS,
     CATEGORY_HELP,
     CATEGORY_UTILITY,
 ]
@@ -118,6 +121,11 @@ ADMIN_NAMES: Set[str] = {
 
 RR_NAMES: Set[str] = {"reactionrole", "getallroles"}
 
+# FactionAccess (packages/faction_access — allied-faction licensing). The
+# !license group and the !request hotline; subcommands are caught via the
+# package module path and the group's root name (see _category).
+ACCESS_NAMES: Set[str] = {"license", "request"}
+
 _CATEGORY_KEYWORDS: Dict[str, str] = {
     "verify": CATEGORY_VERIFICATION, "verification": CATEGORY_VERIFICATION,
     "poll": CATEGORY_POLLS, "polls": CATEGORY_POLLS, "vote": CATEGORY_POLLS,
@@ -139,6 +147,9 @@ _CATEGORY_KEYWORDS: Dict[str, str] = {
     "configuration": CATEGORY_ADMIN, "config": CATEGORY_ADMIN,
     "setup": CATEGORY_SETUP, "settings": CATEGORY_SETUP,
     "help": CATEGORY_HELP, "commands": CATEGORY_HELP,
+    "license": CATEGORY_ACCESS, "licensing": CATEGORY_ACCESS,
+    "faction": CATEGORY_ACCESS, "faction access": CATEGORY_ACCESS,
+    "ally": CATEGORY_ACCESS, "allied": CATEGORY_ACCESS, "allies": CATEGORY_ACCESS,
     "utility": CATEGORY_UTILITY, "utilities": CATEGORY_UTILITY,
     "misc": CATEGORY_UTILITY, "other": CATEGORY_UTILITY, "others": CATEGORY_UTILITY,
 }
@@ -355,6 +366,16 @@ class HelpCog(commands.Cog, name="FactionHelp"):
             mapped = COG_CATEGORY_MAP.get(cog.qualified_name)
             if mapped is not None:
                 return mapped
+        # FactionAccess first: the module path is exact, and the root-name
+        # check catches every !license subcommand — so names like "resume"
+        # or "info" can never fall into the generic name sets below
+        # ("resume" is also a ticket command).
+        module = getattr(getattr(command, "callback", None), "__module__", "") or ""
+        if module == "packages.faction_access" or module.startswith("packages.faction_access."):
+            return CATEGORY_ACCESS
+        root_name = (getattr(top, "name", "") or "").lower()
+        if root_name in ACCESS_NAMES:
+            return CATEGORY_ACCESS
         name = command.name.lower()
         if name in ADMIN_NAMES:
             return CATEGORY_ADMIN
@@ -364,7 +385,6 @@ class HelpCog(commands.Cog, name="FactionHelp"):
             return CATEGORY_TICKETS
         if name in RR_NAMES:
             return CATEGORY_REACTION
-        module = getattr(getattr(command, "callback", None), "__module__", "") or ""
         if module == "TicketTool" or module.startswith("TicketTool."):
             return CATEGORY_TICKETS
         if module == "ReactionRoles" or module.startswith("ReactionRoles."):
@@ -487,7 +507,10 @@ class HelpCog(commands.Cog, name="FactionHelp"):
         )
         embed = botkit.neutral(f"{category} — {len(commands_list)} commands", description)
         if total_pages > 1:
-            embed.set_footer(text=f"Page {page + 1}/{total_pages}")
+            embed.set_footer(text=(
+                f"Page {page + 1}/{total_pages} • "
+                f"FactionBot {EDITION} v{__version__}"
+            ))
         return embed, page, total_pages
 
     # ------------------------------------------------------------------

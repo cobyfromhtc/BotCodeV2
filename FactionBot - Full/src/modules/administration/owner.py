@@ -10,7 +10,7 @@ from discord.ext import commands
 from discord.ui import Button, View
 from typing import List, Optional
 
-from core import state  # shared mutable runtime state
+from core import EDITION, __version__, state  # shared mutable runtime state
 from core.state import config, data_manager
 from core.helpers import brand_text
 from core.ows import OWSToggle, OWS_CATEGORIES, OWS_TOGGLES, ows_bulk_set_category, ows_get, ows_set
@@ -48,8 +48,7 @@ def build_tutorial_embeds() -> List[discord.Embed]:
     e1.add_field(
         name="✅ Prerequisites (verify these first)",
         value=(
-            "1. **Bot invited with both** `bot` **and** `applications.commands` **scopes**\n"
-            "   (re-invite with the URL containing `scope=bot applications.commands`)\n"
+            "1. **Bot invited with the `bot` scope** (the bot is prefix-only — no `applications.commands` scope is needed)\n"
             "2. **Privileged Gateway Intents enabled** in the Discord Developer Portal:\n"
             "   • Server Members Intent  • Message Content Intent  • Presence Intent\n"
             "3. **Bot has Administrator** (or equivalent) permissions in your server."
@@ -58,10 +57,10 @@ def build_tutorial_embeds() -> List[discord.Embed]:
     )
     e1.add_field(
         name="📚 What this tutorial covers",
-        value="`Step 1` Branding  •  `Step 2` Channels (`!channelsetup`)  •  `Step 3` Cross-Server Rules  •  `Step 4` Roles (`!rolesetup`)  •  `Step 5` Final Checks  •  `Page 7` New & Notable (Servers / Timing / Limits setup)",
+        value="`Step 1` Branding  •  `Step 2` Channels (`!channelsetup`)  •  `Step 3` Cross-Server Rules  •  `Step 4` Roles (`!rolesetup`)  •  `Step 5` Final Checks  •  `Page 7` New & Notable (Servers / Timing / Limits setup)  •  `Page 8` Multi-Guild Licensing (FactionAccess)",
         inline=False,
     )
-    e1.set_footer(text="Page 1/7 • First-time setup tutorial")
+    e1.set_footer(text=f"Page 1/8 • First-time setup tutorial • FactionBot {EDITION} v{__version__}")
     embeds.append(e1)
 
     # --- Page 2: Branding ---
@@ -88,7 +87,7 @@ def build_tutorial_embeds() -> List[discord.Embed]:
         value="`!botstatus`\nShows the current status. Edit `config.bot_status` to change what the bot is \"Watching\".",
         inline=False,
     )
-    e2.set_footer(text="Page 2/7 • Branding")
+    e2.set_footer(text="Page 2/8 • Branding")
     embeds.append(e2)
 
     # --- Page 3: In-Server Channels ---
@@ -129,7 +128,7 @@ def build_tutorial_embeds() -> List[discord.Embed]:
         ),
         inline=False,
     )
-    e3.set_footer(text="Page 3/7 • In-Server Channels")
+    e3.set_footer(text="Page 3/8 • In-Server Channels")
     embeds.append(e3)
 
     # --- Page 4: Cross-Server Rules Sources ---
@@ -159,7 +158,7 @@ def build_tutorial_embeds() -> List[discord.Embed]:
         ),
         inline=False,
     )
-    e4.set_footer(text="Page 4/7 • Cross-Server Rules")
+    e4.set_footer(text="Page 4/8 • Cross-Server Rules")
     embeds.append(e4)
 
     # --- Page 5: Roles ---
@@ -200,7 +199,7 @@ def build_tutorial_embeds() -> List[discord.Embed]:
         ),
         inline=False,
     )
-    e5.set_footer(text="Page 5/7 • Roles & Setup Commands")
+    e5.set_footer(text="Page 5/8 • Roles & Setup Commands")
     embeds.append(e5)
 
     # --- Page 6: Final Steps ---
@@ -224,18 +223,47 @@ def build_tutorial_embeds() -> List[discord.Embed]:
         value="`!tutorial`\nRe-sends this guide to your DMs anytime.",
         inline=False,
     )
-    e6.set_footer(text=f"Page 6/7 • You're all set! Welcome to {gn}. 🎉")
+    e6.set_footer(text=f"Page 6/8 • You're all set! Welcome to {gn}. 🎉")
     embeds.append(e6)
 
     # --- Page 7: New & Notable Features (today's changes) ---
     e7 = discord.Embed(
         title="🆕 New & Notable Features — What Changed Recently",
         description=(
-            "A quick rundown of the most recent improvements so you don't miss them. "
+            f"A quick rundown of the most recent improvements (FactionBot "
+            f"{EDITION} v{__version__}) so you don't miss them. "
             "Most of these are transparent — they just work better behind the scenes."
         ),
         color=discord.Color.gold(),
         timestamp=datetime.now(timezone.utc),
+    )
+    e7.add_field(
+        name="🛡️ Multi-guild licensing — FactionAccess (v4.2.0)",
+        value=(
+            "• **`!license`** — approve / revoke / suspend allied factions, grant feature "
+            "bundles (verification, tickets, moderation, engagement, leveling, …) per "
+            "guild, set per-guild gang identity + bot nickname, expiry, audit trail.\n"
+            "• **`!request`** — allied faction leaders ping you for access or more bundles.\n"
+            "• **`!license invite <guild>`** — a pre-scoped OAuth invite link.\n"
+            "• Everything else stays home-guild-only by default (default-deny)."
+        ),
+        inline=False,
+    )
+    e7.add_field(
+        name="🏗️ SaaS-quality repository pass (v4.1.0)",
+        value=(
+            "• **Repo hygiene** — `.gitignore` added; secrets (`.env`), databases, logs "
+            "and stale bytecode are no longer committed. `.env.example` is the new "
+            "committed template (`cp .env.example .env`).\n"
+            "• **Documentation** — `docs/FEATURES.md` (Short/Full parity matrix), "
+            "`docs/CHANGELOG.md` and `docs/PERFORMANCE.md` now exist and are "
+            "cross-referenced from the code.\n"
+            "• **Premium package parity** — the tickettool / reactionroles packages "
+            "are byte-identical across the Short and Full editions again.\n"
+            "• **Version metadata** — the edition + version now show in the startup "
+            "banner and the `!cmds` footer."
+        ),
+        inline=False,
     )
     e7.add_field(
         name="🧹 `!purge [amount] [-del]` — command message cleanup",
@@ -289,8 +317,69 @@ def build_tutorial_embeds() -> List[discord.Embed]:
         ),
         inline=False,
     )
-    e7.set_footer(text=f"Page 7/7 • {gn} — keeping the streets clean.")
+    e7.set_footer(text=f"Page 7/8 • {gn} — keeping the streets clean.")
     embeds.append(e7)
+
+    # --- Page 8: Multi-Guild Licensing (FactionAccess) ---
+    e8 = discord.Embed(
+        title="🛡️ FactionAccess — Running the Bot for Allied Factions",
+        description=(
+            f"This server (**{gn}**) is the **home faction** and keeps every system. "
+            "You can also license the SAME bot out to allied factions — they add it "
+            "to their server and get only the systems you grant, while you keep "
+            "license authority.\n\n"
+            "Everything below is managed with `!license` subcommands."
+        ),
+        color=discord.Color.dark_teal(),
+        timestamp=datetime.now(timezone.utc),
+    )
+    e8.add_field(
+        name="1️⃣ Get the bot into their server",
+        value=(
+            "`!license invite <their guild id>` prints an OAuth link locked to that "
+            "guild. Their leader (needs Manage Server) opens it and authorizes. The "
+            "bot joins **pending** — nothing works there yet."
+        ),
+        inline=False,
+    )
+    e8.add_field(
+        name="2️⃣ Approve + grant systems",
+        value=(
+            "You get a DM join request. Then:\n"
+            "`!license approve <guild> verification`  ← grants only verification\n"
+            "`!license grant <guild> tickets leveling` ← add more later\n"
+            "`!license ungrant <guild> tickets`       ← take one away\n"
+            "`!license catalog`                       ← every bundle + command count"
+        ),
+        inline=False,
+    )
+    e8.add_field(
+        name="3️⃣ Give them their own identity",
+        value=(
+            "`!license identity <guild> tag ALLY name \"Ally Faction\" display \"ALLY Moderation\"`\n"
+            "The bot's NICKNAME changes per server (your gang's name at home, the "
+            "ally's own name in their server) and embed footers rebrand there "
+            "automatically. The global gang name and presence stay yours."
+        ),
+        inline=False,
+    )
+    e8.add_field(
+        name="4️⃣ Keep control",
+        value=(
+            "• `!license suspend` / `resume` / `revoke` — instant off-switches\n"
+            "• `!license expiry <guild> 30d` — time-limited licenses that auto-suspend\n"
+            "• `!license authority add @user` — share license authority without giving "
+            "up the bot (stored in settings, never hardcoded)\n"
+            "• `!license audit` — every action on record\n"
+            "• Allied leaders reach you with `!request` (rate-limited)\n\n"
+            "_Default-deny: any command not in a granted bundle is home-only, and "
+            "home-config automations (welcome messages, blacklist scans) never run "
+            "in allied servers._"
+        ),
+        inline=False,
+    )
+    e8.set_footer(text=f"Page 8/8 • FactionAccess — {gn} stays in control.")
+    embeds.append(e8)
 
     return embeds
 

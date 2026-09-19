@@ -85,7 +85,7 @@ def register(bot):
     # GROUP PARENT
     # =================================================================
     @bot.group(name="reactionrole", aliases=["rr"],
-               description="Reaction Roles (Carl-bot style, up to 250)")
+               description="Reaction Roles (Carl-bot style, up to 250)", invoke_without_command=True)
     @app_commands.default_permissions(manage_roles=True)
     async def rr_group(ctx: commands.Context) -> None:
         if ctx.invoked_subcommand is None:

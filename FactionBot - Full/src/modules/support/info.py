@@ -9,6 +9,7 @@ from discord.ext import commands
 from discord.ui import Button, View
 from typing import List, Tuple
 
+from core import EDITION, __version__
 from core.state import config, data_manager
 from core.helpers import brand_text, get_uptime
 from utils.ui.embeds import EmbedBuilder
@@ -47,7 +48,10 @@ class PaginatedHelpView(View):
     def current_embed(self) -> discord.Embed:
         embed = self.pages[self.current_page]
         # Update the footer to reflect the current page number.
-        embed.set_footer(text=f"Page {self.current_page + 1}/{len(self.pages)} • {brand_text('[GANG ABBR]')} Commands")
+        embed.set_footer(text=(
+            f"Page {self.current_page + 1}/{len(self.pages)} • "
+            f"{brand_text('[GANG ABBR]')} Commands • FactionBot {EDITION} v{__version__}"
+        ))
         return embed
 
     async def _check_owner(self, interaction: discord.Interaction) -> bool:
@@ -358,6 +362,31 @@ def build_help_pages() -> List[discord.Embed]:
             "`!ows` - Owner settings panel (feature toggles, 60+ switches)",
             "",
             "_(All setup values persist to the database and reload on restart.)_",
+        ]),
+        ("🤝 Faction Access — License Management", [
+            "`!license` - Show this server's license panel (DMs: authority dashboard)",
+            "`!license pending` - Guilds waiting for approval",
+            "`!license approve <guild> [bundle …]` - Approve a pending guild (+ optional bundles)",
+            "`!license deny <guild> [reason]` - Deny a pending guild",
+            "`!license suspend <guild> [reason]` - Suspend a license (instant off-switch)",
+            "`!license resume <guild>` - Re-enable a suspended license",
+            "`!license revoke <guild> [reason]` - Revoke (re-joining needs re-approval)",
+            "`!license expiry <guild> <30d|12h|…|off>` - Time-limited license (auto-suspends)",
+            "`!license list [all|licensed|pending|suspended|revoked|left|home]` - Guilds by status",
+            "`!license info <guild|here|id>` - One guild's full license record",
+            "`!license home [guild|here]` - Show / set the home faction guild",
+        ]),
+        ("🤝 Faction Access — Bundles, Identity & Authority", [
+            "`!license grant <guild> <bundle …>` - Grant feature bundles (approve first)",
+            "`!license ungrant <guild> <bundle …>` - Take bundles away",
+            "`!license catalog` - Every bundle + command count (public)",
+            "`!license identity <guild> [tag <t>] [name \"<n>\"] [display \"<d>\"] | reset` - Per-guild identity",
+            "`!license authority [add|remove] @user` - License authority allowlist (app owner always qualifies)",
+            "`!license invite [guild|id]` - Pre-scoped OAuth invite link",
+            "`!license audit [guild] [count]` - Audit trail of every licensing action",
+            "`!request <note>` - Allied server leaders: reach the license authority (rate-limited)",
+            "",
+            "_(Allied factions only get granted bundles — unclassified commands stay home-only; `!license catalog` shows drift)_",
         ]),
         ("📦 Other", [
             "`!report @user` - Report a user",

@@ -20,3 +20,10 @@ config = Config()
 # "unable to open database file".
 config.ensure_directories()
 data_manager = DataManager(config.db_file)
+
+# --- FACTIONACCESS SERVICE (set in setup_hook) ---
+# packages.faction_access.wiring.on_setup_hook assigns the licensing service
+# here (and on the bot instance). Declared so the attribute exists even
+# before setup runs; feature modules read it via ``getattr(state,
+# 'faction_access', None)`` or the bot attribute.
+faction_access = None

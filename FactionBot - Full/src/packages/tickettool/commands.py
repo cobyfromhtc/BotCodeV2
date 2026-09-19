@@ -73,20 +73,25 @@ def register(bot):
         pid = ticket.get('panel_id')
         return tt.data_manager.load_ticket_panel(pid) if pid else None
 
-    def _parse_id(raw, *, mention_prefix: str = '<@&') -> Optional[int]:
+    def _parse_id(raw, *, strips: str = '<@&') -> Optional[int]:
         '''Parse an optional role/channel/user ID (or mention) into an int.
 
-        Raises ValueError for non-numeric input so callers can respond with a
-        clear ephemeral error instead of a traceback.
+        `strips` is the set of leading characters to trim from a mention
+        (e.g. ``<@&`` for roles, ``<#`` for channels). Raises ValueError for
+        non-numeric input so callers can respond with a clear ephemeral
+        error instead of a traceback.
         '''
         if raw is None:
             return None
-        return int(str(raw).strip().lstrip(mention_prefix).rstrip('>'))
+        return int(str(raw).strip().lstrip(strips).rstrip('>'))
 
     # =================================================================
     # NAMING (Feature 5 + 8)
     # =================================================================
-    @bot.command(name="naming", description="Configure ticket naming templates + number padding")
+    @bot.command(
+        name="naming",
+        description="Configure ticket naming templates + number padding",
+    )
     @commands.has_permissions(manage_channels=True)
     @app_commands.describe(
         panel_id="Panel ID (use !panels to list)",
@@ -95,18 +100,23 @@ def register(bot):
         claimed_template="Claimed-ticket name template (optional)",
         padding="Zero-pad the ticket count to this many digits (0-20, e.g. 4 -> #0057)",
     )
-    async def naming_cmd(ctx: commands.Context, panel_id: str,
-                          open_template: Optional[str] = None,
-                          closed_template: Optional[str] = None,
-                          claimed_template: Optional[str] = None,
-                          padding: Optional[int] = None) -> None:
+    async def naming_cmd(
+        ctx: commands.Context,
+        panel_id: str,
+        open_template: Optional[str] = None,
+        closed_template: Optional[str] = None,
+        claimed_template: Optional[str] = None,
+        padding: Optional[int] = None,
+    ) -> None:
+        ephemeral = ctx.interaction is not None
         pdb = _pdb()
         if pdb is None:
-            await ctx.send("Premium system not initialized.", ephemeral=True)
+            await ctx.send("Premium system not initialized.", ephemeral=ephemeral)
             return
-        panel = bot.ticket_tool.data_manager.load_ticket_panel(panel_id) if hasattr(bot, 'ticket_tool') else None
+        tt = getattr(bot, 'ticket_tool', None)
+        panel = tt.data_manager.load_ticket_panel(panel_id) if tt is not None else None
         if not panel:
-            await ctx.send(f"Panel `{panel_id}` not found.", ephemeral=True)
+            await ctx.send(f"Panel `{panel_id}` not found.", ephemeral=ephemeral)
             return
         existing = pdb.get_naming(panel_id) or {}
         cfg = {
@@ -118,7 +128,7 @@ def register(bot):
             'number_padding': int(padding) if padding is not None else int(existing.get('number_padding') or 0),
         }
         if int(cfg['number_padding']) < 0 or int(cfg['number_padding']) > 20:
-            await ctx.send("Padding must be between 0 and 20.", ephemeral=True)
+            await ctx.send("Padding must be between 0 and 20.", ephemeral=ephemeral)
             return
         pdb.upsert_naming(cfg)
         embed = discord.Embed(title="🏷️ Ticket Naming Configured", color=discord.Color.green())
@@ -127,8 +137,12 @@ def register(bot):
         embed.add_field(name="Closed template", value=f"`{cfg['closed_template'] or '(none)'}`", inline=False)
         embed.add_field(name="Claimed template", value=f"`{cfg['claimed_template'] or '(none)'}`", inline=False)
         embed.add_field(name="Number padding", value=str(cfg['number_padding']), inline=True)
-        embed.add_field(name="Variables", value="{ticket.id} {ticket.count} {ticket.user} {claim.user} {panel.name} |lower |upper |pad:4 |truncate:20", inline=False)
-        await ctx.send(embed=embed, ephemeral=True)
+        embed.add_field(
+            name="Variables",
+            value="{ticket.id} {ticket.count} {ticket.user} {claim.user} {panel.name} |lower |upper |pad:4 |truncate:20",
+            inline=False,
+        )
+        await ctx.send(embed=embed, ephemeral=ephemeral)
 
     # =================================================================
     # SCHEDULING (Feature 4)
@@ -492,7 +506,7 @@ def register(bot):
         if save_mode not in tr_mod.SAVE_MODES:
             await ctx.send(f"Invalid save_mode. Use: {', '.join(tr_mod.SAVE_MODES)}", ephemeral=True); return
         try:
-            archive_id = _parse_id(auto_save_channel_id, mention_prefix='<#')
+            archive_id = _parse_id(auto_save_channel_id, strips='<#')
         except ValueError:
             await ctx.send("Invalid ID: auto_save_channel_id must be a number.", ephemeral=True); return
         # Merge over the existing config so the Tier-3 keys set by
@@ -768,7 +782,7 @@ def register(bot):
         tt = getattr(bot, 'ticket_tool', None)
         if tt is None:
             await ctx.send("Ticket system not initialized.", ephemeral=True); return
-        pid = int(parent_channel_id.lstrip('<#').rstrip('>')) if parent_channel_id else None
+        pid = _parse_id(parent_channel_id, strips='<#')
         ok = tt_mod.configure_panel_for_threads(pdb, tt.data_manager, panel_id, ctx.guild.id,
                                                   enabled=enabled, parent_channel_id=pid,
                                                   allow_user_invite=allow_user_invite)
@@ -1319,7 +1333,7 @@ def register(bot):
         if pdb is None:
             await ctx.send("Premium not initialized.", ephemeral=True); return
         try:
-            rch = _parse_id(review_channel_id, mention_prefix='<#')
+            rch = _parse_id(review_channel_id, strips='<#')
         except ValueError:
             await ctx.send("Invalid ID: review_channel_id must be a number.", ephemeral=True); return
         if rch is None:
@@ -1415,9 +1429,9 @@ def register(bot):
         await ctx.send(embed=embed, ephemeral=True)
 
     # =================================================================
-    # CANNED REPLIES (Ticket Tool !canned) — prefix-only command group
+    # CANNED REPLIES (Ticket Tool !canned) — hybrid command group
     # =================================================================
-    @bot.group(name="canned", description="Canned replies: saved response snippets for tickets")
+    @bot.group(name="canned", description="Canned replies: saved response snippets for tickets", invoke_without_command=True)
     async def canned_group(ctx: commands.Context) -> None:
         pdb = _pdb()
         if pdb is None:

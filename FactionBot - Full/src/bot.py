@@ -65,6 +65,7 @@ logging.info("[Startup] Logging configured — beginning bot initialization...")
 # ═══════════════════════════════════════════════════════════════════════════
 from packages import tickettool as TicketTool
 from packages import reactionroles as ReactionRoles
+from packages import faction_access as FactionAccess
 
 # ═══════════════════════════════════════════════════════════════════════════
 # LAYERED STRUCTURE (SaaS layout):
@@ -76,7 +77,7 @@ from packages import reactionroles as ReactionRoles
 #             family contract register(bot)
 #   packages/ tickettool + reactionroles feature packages
 # ═══════════════════════════════════════════════════════════════════════════
-from core import state
+from core import EDITION, state, __version__
 from core.state import config, data_manager
 from core.ows import hydrate_ows_settings, ows_get
 from core.helpers import PREMIUM_AVAILABLE, RR_AVAILABLE
@@ -195,6 +196,16 @@ class TicketBot(commands.Bot):
             except Exception as exc:
                 logging.exception(f"[SetupHook] ReactionRoles.on_setup_hook failed: {exc}")
 
+        # --- FACTIONACCESS SCHEMA INSTALL + SERVICE ---
+        # Installs the faction_* tables (idempotent), builds the licensing
+        # service and stashes it as bot.faction_access / state.faction_access.
+        # Owns the multi-guild license lifecycle, per-guild identity and the
+        # data behind the global command gate installed at import time.
+        try:
+            FactionAccess.wiring.on_setup_hook(data_manager, self)
+        except Exception as exc:
+            logging.exception(f"[SetupHook] FactionAccess.on_setup_hook failed: {exc}")
+
 
 print("[Startup] Creating bot instance...")
 bot = TicketBot(command_prefix=config.command_prefix, intents=intents)
@@ -223,6 +234,19 @@ if RR_AVAILABLE:
         logging.exception(f"[ReactionRoles] command registration failed: {exc}")
         print(f"[Startup] WARNING: ReactionRoles registration FAILED: {exc}")
 
+# Register FactionAccess prefix commands (!license group + !request) and
+# install the global command gate. The gate is fail-open until setup_hook
+# attaches the service, so the home faction can never be locked out by a
+# startup ordering issue.
+try:
+    FactionAccess.commands.register(bot)
+    FactionAccess.gating.install(bot)
+    logging.info("[FactionAccess] registered !license group + !request and installed the command gate")
+    print(f"[Startup] FactionAccess registered. Total commands: {len(bot.commands)}")
+except Exception as exc:
+    logging.exception(f"[FactionAccess] registration failed: {exc}")
+    print(f"[Startup] WARNING: FactionAccess registration FAILED: {exc}")
+
 # ═══════════════════════════════════════════════════════════════════════════
 # COG REGISTRATION — every feature module registers itself on the bot
 # through the family contract: register(bot). Deterministic, synchronous,
@@ -235,6 +259,11 @@ import modules.runtime.events as _events_mod
 register_all(bot)
 _events_mod.register_events(bot)
 logging.info("[Modules] registered lifecycle event handlers")
+
+# FactionAccess guild-membership events (on_guild_join / on_guild_remove are
+# unclaimed by every module — the package owns them outright).
+FactionAccess.wiring.register_events(bot)
+logging.info("[FactionAccess] registered guild membership event handlers")
 state.bot = bot
 
 
@@ -262,14 +291,17 @@ def main() -> None:
         print("Put your Discord bot token in one of these files:")
         print("  • .env          (project root)  ->  BOT_TOKEN=your-token")
         print("  • tokens.txt    (project root)  ->  BOT_Token=your-token")
+        print("Tip: the committed .env.example is a ready-to-copy template:")
+        print("  cp .env.example .env")
         print("Then run:  python src/bot.py")
         print("=" * 60)
         logging.error("Bot token not found.")
         exit(1)
 
-    print("=" * 50)
-    print(f"{config.gang_name} BOT - Starting (By IdkAnymore_039)")
-    print("=" * 50)
+    print("=" * 60)
+    print(f"FactionBot {EDITION} Edition v{__version__} — starting")
+    print(f"Configured for: {config.gang_name} (By IdkAnymore_039)")
+    print("=" * 60)
     try:
         bot.run(token)
     except (discord.LoginFailure, discord.HTTPException) as exc:

@@ -63,6 +63,34 @@ def _parse_iso(s) -> Optional[datetime]:
         return None
 
 
+def _write_staff_stats_cache(pdb: PremiumDB, guild_id: int, entries: List[Dict]) -> None:
+    """Persist computed staff aggregates into the `ticket_staff_stats` cache.
+
+    Called ONCE per `build_staff_report` invocation — the report builders
+    themselves stay pure read paths so a `!staffstats` command never blocks
+    the event loop on N synchronous SQLite writes.
+    """
+    try:
+        for entry in entries:
+            pdb.upsert_staff_stats({
+                'guild_id': guild_id,
+                'staff_id': entry['staff_id'],
+                'tickets_claimed': entry['tickets_claimed'],
+                'tickets_closed': entry['tickets_closed'],
+                'ratings_count': entry['ratings_count'],
+                'ratings_sum': int(entry.get('ratings_sum', 0) or 0),
+                'avg_rating': float(entry.get('avg_rating') or 0.0),
+                'avg_first_response_minutes': float(
+                    entry.get('avg_first_response_minutes') or 0.0
+                ),
+                'avg_resolution_minutes': float(
+                    entry.get('avg_resolution_minutes') or 0.0
+                ),
+            })
+    except Exception as exc:
+        logging.warning(f"[analytics] staff stats cache write failed: {exc}")
+
+
 # =====================================================================
 # OVERVIEW ANALYTICS
 # =====================================================================
@@ -293,27 +321,28 @@ def build_staff_report(pdb: PremiumDB, guild_id: int) -> List[Dict]:
         if created and closed:
             stats[sid]['resolution_minutes'].append((closed - created).total_seconds()/60.0)
 
-    out = []
+    out: List[Dict] = []
     for sid, s in stats.items():
-        avg_r = round(s['ratings_sum']/s['ratings_count'], 2) if s['ratings_count'] else None
-        avg_fr = round(sum(s['first_response_minutes'])/len(s['first_response_minutes']), 2) if s['first_response_minutes'] else None
-        avg_res = round(sum(s['resolution_minutes'])/len(s['resolution_minutes']), 2) if s['resolution_minutes'] else None
+        avg_r = round(s['ratings_sum'] / s['ratings_count'], 2) \
+            if s['ratings_count'] else None
+        avg_fr = round(sum(s['first_response_minutes']) / len(s['first_response_minutes']), 2) \
+            if s['first_response_minutes'] else None
+        avg_res = round(sum(s['resolution_minutes']) / len(s['resolution_minutes']), 2) \
+            if s['resolution_minutes'] else None
         out.append({
             'staff_id': sid,
             'tickets_claimed': s['tickets_claimed'],
             'tickets_closed': s['tickets_closed'],
             'ratings_count': s['ratings_count'],
+            'ratings_sum': int(s.get('ratings_sum', 0) or 0),
             'avg_rating': avg_r,
             'avg_first_response_minutes': avg_fr,
             'avg_resolution_minutes': avg_res,
         })
-    # Cache the aggregates for fast dashboard reads.
-    for entry in out:
-        sid = entry['staff_id']
-        s = stats.get(sid, {})
-        pdb.upsert_staff_stats({**entry, 'guild_id': guild_id,
-                                'ratings_sum': int(s.get('ratings_sum', 0))})
     out.sort(key=lambda e: (e['avg_rating'] or 0, e['tickets_closed']), reverse=True)
+    # Single bulk write to the cache (previously this happened per-entry
+    # inside the loop above, blocking the event loop for every staff member).
+    _write_staff_stats_cache(pdb, guild_id, out)
     return out
 
 

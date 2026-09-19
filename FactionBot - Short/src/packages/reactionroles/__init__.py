@@ -1,18 +1,9 @@
 # -*- coding: utf-8 -*-
-"""ReactionRoles — extracted reaction-roles package (5 modules)."""
+"""FactionBot ReactionRoles — reaction-role feature package (5 modules).
 
-from . import (
-    commands,
-    db,
-    modal,
-    system,
-    wiring,
-)
+Dependency order: db -> system -> modal -> commands -> wiring.
+"""
 
-__all__ = [
-    "commands",
-    "db",
-    "modal",
-    "system",
-    "wiring",
-]
+from . import db, system, modal, commands, wiring
+
+__all__ = ["db", "system", "modal", "commands", "wiring"]

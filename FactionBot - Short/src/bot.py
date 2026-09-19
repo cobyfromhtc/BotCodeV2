@@ -99,6 +99,7 @@ if _HERE not in sys.path:
 
 from packages import tickettool as TicketTool
 from packages import reactionroles as ReactionRoles
+from packages import faction_access as FactionAccess
 
 PREMIUM_AVAILABLE = True
 RR_AVAILABLE = True
@@ -112,6 +113,7 @@ RR_AVAILABLE = True
 # src/bot.py keeps ONLY the application layer: bot subclass, views, commands,
 # events, tasks, the multi-bot domain machinery and main().
 # ═══════════════════════════════════════════════════════════════════════════
+from core import EDITION, __version__
 from core.data_manager import DataManager
 from core.state import config, data_manager
 from config.environment import (
@@ -353,6 +355,16 @@ class TicketBot(commands.Bot):
                 ReactionRoles.wiring.on_setup_hook(data_manager, self)
             except Exception as exc:
                 logging.exception(f"[SetupHook] ReactionRoles.on_setup_hook failed: {exc}")
+
+        # --- FACTIONACCESS SCHEMA INSTALL + SERVICE ---
+        # Installs the faction_* tables (idempotent), builds the licensing
+        # service and stashes it as bot.faction_access / state.faction_access.
+        # Owns the multi-guild license lifecycle, per-guild identity and the
+        # data behind the global command gate installed earlier in this file.
+        try:
+            FactionAccess.wiring.on_setup_hook(data_manager, self)
+        except Exception as exc:
+            logging.exception(f"[SetupHook] FactionAccess.on_setup_hook failed: {exc}")
 
         # --- TICKET TOOL SYSTEM (moved from on_ready) ---
         # Previously created in on_ready. That meant any gateway event
@@ -742,6 +754,21 @@ if RR_AVAILABLE:
         logging.exception(f"[ReactionRoles] command registration failed: {exc}")
         print(f"[Startup] WARNING: ReactionRoles registration FAILED: {exc}")
 
+# Register FactionAccess prefix commands (!license group + !request), install
+# the global command gate and take ownership of on_guild_join/remove (both
+# unclaimed in this monolith). The gate is fail-open until setup_hook attaches
+# the service, so the home faction can never be locked out by a startup
+# ordering issue.
+try:
+    FactionAccess.commands.register(bot)
+    FactionAccess.gating.install(bot)
+    FactionAccess.wiring.register_events(bot)
+    logging.info("[FactionAccess] registered !license group + !request, installed the command gate and claimed guild membership events")
+    print(f"[Startup] FactionAccess registered. Total commands: {len(bot.commands)}")
+except Exception as exc:
+    logging.exception(f"[FactionAccess] registration failed: {exc}")
+    print(f"[Startup] WARNING: FactionAccess registration FAILED: {exc}")
+
 
 
 # Once-flag: ensure the one-time portion of on_ready runs only on the first
@@ -940,16 +967,47 @@ class EmbedBuilder:
     def branded(base_embed: discord.Embed, guild_id: Optional[int]) -> discord.Embed:
         """Apply per-guild custom branding (footer / color / thumbnail / image)
         to an existing embed. Falls back gracefully if no branding is configured
-        or the data manager isn't ready yet (called very early in startup)."""
+        or the data manager isn't ready yet (called very early in startup).
+
+        FactionAccess integration: when the guild carries a faction identity
+        override (an allied faction's own tag and name), [GANG NAME] /
+        [GANG ABBR] tokens in the footer resolve to THAT guild's names, and
+        otherwise-unbranded embeds get the default
+        "FactionBot • <that guild's gang name>" footer. The home faction keeps
+        its exact pre-FactionAccess appearance (resolve falls back to the
+        global config values there)."""
         try:
             if data_manager is None or data_manager._connection is None:
                 return base_embed
             if guild_id is None:
                 return base_embed
+            # Per-guild faction identity — resolved off the bot instance so no
+            # new module-level coupling is introduced in this monolith.
+            faction = getattr(bot, 'faction_access', None)
+            gang_name = config.gang_name
+            has_identity_override = False
+            if faction is not None:
+                try:
+                    identity = faction.identity_for(guild_id)
+                    gang_name = identity.gang_name or gang_name
+                    has_identity_override = identity.is_override
+                except Exception:
+                    pass
             branding = data_manager.get_branding(guild_id)
             footer = branding.get('embed_footer')
             if footer:
-                base_embed.set_footer(text=brand_text(footer))
+                if faction is not None:
+                    # Per-guild substitution (legacy tokens + placeholders).
+                    try:
+                        base_embed.set_footer(text=faction.resolve_text(footer, guild_id))
+                    except Exception:
+                        base_embed.set_footer(text=brand_text(footer))
+                else:
+                    base_embed.set_footer(text=brand_text(footer))
+            elif has_identity_override:
+                # Allied guild with an identity but no custom footer: still
+                # present as its own faction instead of going unbranded.
+                base_embed.set_footer(text=f"FactionBot • {gang_name}")
             color = branding.get('embed_color')
             if isinstance(color, int):
                 base_embed.colour = discord.Color(color)
@@ -5245,8 +5303,7 @@ def build_tutorial_embeds() -> List[discord.Embed]:
     e1.add_field(
         name="✅ Prerequisites (verify these first)",
         value=(
-            "1. **Bot invited with both** `bot` **and** `applications.commands` **scopes**\n"
-            "   (re-invite with the URL containing `scope=bot applications.commands`)\n"
+            "1. **Bot invited with the `bot` scope** (the bot is prefix-only — no `applications.commands` scope is needed)\n"
             "2. **Privileged Gateway Intents enabled** in the Discord Developer Portal:\n"
             "   • Server Members Intent  •  Message Content Intent  •  Presence Intent\n"
             "3. **Bot has Administrator** (or equivalent) permissions in your server."
@@ -5258,11 +5315,11 @@ def build_tutorial_embeds() -> List[discord.Embed]:
         value=(
             "`Step 1` Guided Setup (`!csetup`)  •  `Step 2` Channels & Roles  •  "
             "`Step 3` The Six Core Systems  •  `Step 4` Branding  •  `Step 5` Final Checks  •  "
-            "`Page 7` New & Notable"
+            "`Page 7` New & Notable  •  `Page 8` Multi-Guild Licensing (FactionAccess)"
         ),
         inline=False,
     )
-    e1.set_footer(text="Page 1/7 • First-time setup tutorial")
+    e1.set_footer(text=f"Page 1/8 • First-time setup tutorial • FactionBot {EDITION} v{__version__}")
     embeds.append(e1)
 
     # --- Page 2: Guided Setup ---
@@ -5286,7 +5343,7 @@ def build_tutorial_embeds() -> List[discord.Embed]:
         ),
         inline=False,
     )
-    e2.set_footer(text="Page 2/7 • Guided Setup")
+    e2.set_footer(text="Page 2/8 • Guided Setup")
     embeds.append(e2)
 
     # --- Page 3: Channels & Roles ---
@@ -5337,7 +5394,7 @@ def build_tutorial_embeds() -> List[discord.Embed]:
         ),
         inline=False,
     )
-    e3.set_footer(text="Page 3/7 • Channels & Roles")
+    e3.set_footer(text="Page 3/8 • Channels & Roles")
     embeds.append(e3)
 
     # --- Page 4: The Six Core Systems ---
@@ -5397,7 +5454,7 @@ def build_tutorial_embeds() -> List[discord.Embed]:
         ),
         inline=False,
     )
-    e4.set_footer(text="Page 4/7 • Core Systems")
+    e4.set_footer(text="Page 4/8 • Core Systems")
     embeds.append(e4)
 
     # --- Page 5: Branding ---
@@ -5426,7 +5483,7 @@ def build_tutorial_embeds() -> List[discord.Embed]:
         ),
         inline=False,
     )
-    e5.set_footer(text="Page 5/7 • Branding")
+    e5.set_footer(text="Page 5/8 • Branding")
     embeds.append(e5)
 
     # --- Page 6: Final Steps ---
@@ -5450,15 +5507,46 @@ def build_tutorial_embeds() -> List[discord.Embed]:
         value="`!tutorial`\nRe-sends this guide to your DMs anytime.",
         inline=False,
     )
-    e6.set_footer(text="Page 6/7 • You're all set! 🎉")
+    e6.set_footer(text="Page 6/8 • You're all set! 🎉")
     embeds.append(e6)
 
     # --- Page 7: New & Notable ---
     e7 = discord.Embed(
         title="🆕 New & Notable — The FactionBot Conversion",
-        description="What this rebuild changed under the hood:",
+        description=(
+            f"What this rebuild changed under the hood (FactionBot "
+            f"{EDITION} v{__version__}):"
+        ),
         color=discord.Color.gold(),
         timestamp=datetime.now(timezone.utc),
+    )
+    e7.add_field(
+        name="🛡️ Multi-guild licensing — FactionAccess (v5.2.0)",
+        value=(
+            "• **`!license`** — approve / revoke / suspend allied factions, grant feature "
+            "bundles (verification, tickets, moderation, engagement, leveling, …) per "
+            "guild, set per-guild gang identity + bot nickname, expiry, audit trail.\n"
+            "• **`!request`** — allied faction leaders ping you for access or more bundles.\n"
+            "• **`!license invite <guild>`** — a pre-scoped OAuth invite link.\n"
+            "• Everything else stays home-guild-only by default (default-deny)."
+        ),
+        inline=False,
+    )
+    e7.add_field(
+        name="🏗️ SaaS-quality repository pass (v5.1.0)",
+        value=(
+            "• **Repo hygiene** — `.gitignore` added; secrets (`.env`), databases, logs "
+            "and stale bytecode are no longer committed. `.env.example` is the new "
+            "committed template (`cp .env.example .env`).\n"
+            "• **Documentation** — `docs/FEATURES.md` (Short/Full parity matrix), "
+            "`docs/CHANGELOG.md` and `docs/PERFORMANCE.md` now exist and are "
+            "cross-referenced from the code.\n"
+            "• **Premium package parity** — the tickettool / reactionroles packages "
+            "are byte-identical across the Short and Full editions again.\n"
+            "• **Version metadata** — the edition + version now show in the startup "
+            "banner and the `!help` footer."
+        ),
+        inline=False,
     )
     e7.add_field(
         name="✅ Verification system (rebuilt)",
@@ -5513,8 +5601,70 @@ def build_tutorial_embeds() -> List[discord.Embed]:
         ),
         inline=False,
     )
-    e7.set_footer(text=f"Page 7/7 • FactionBot — focused, all-in-one.")
+    e7.set_footer(text=f"Page 7/8 • FactionBot — focused, all-in-one.")
     embeds.append(e7)
+
+    # --- Page 8: Multi-Guild Licensing (FactionAccess) ---
+    e8 = discord.Embed(
+        title="🛡️ FactionAccess — Running the Bot for Allied Factions",
+        description=(
+            "This server is the **home faction** and keeps every system. You can also "
+            "license the SAME bot out to allied factions — they add it to their server "
+            "and get only the systems you grant, while you keep license authority.\n\n"
+            "Everything below is managed with `!license` subcommands."
+        ),
+        color=discord.Color.dark_teal(),
+        timestamp=datetime.now(timezone.utc),
+    )
+    e8.add_field(
+        name="1️⃣ Get the bot into their server",
+        value=(
+            "`!license invite <their guild id>` prints an OAuth link locked to that "
+            "guild. Their leader (needs Manage Server) opens it and authorizes. The "
+            "bot joins **pending** — nothing works there yet."
+        ),
+        inline=False,
+    )
+    e8.add_field(
+        name="2️⃣ Approve + grant systems",
+        value=(
+            "You get a DM join request. Then:\n"
+            "`!license approve <guild> verification`  ← grants only verification\n"
+            "`!license grant <guild> tickets leveling` ← add more later\n"
+            "`!license ungrant <guild> tickets`       ← take one away\n"
+            "`!license catalog`                       ← every bundle + command count\n\n"
+            "_Short's core systems are per-guild by design — an allied faction you "
+            "grant `verification` to can run `!verification setup` IN THEIR OWN "
+            "server and the whole flow works there independently._"
+        ),
+        inline=False,
+    )
+    e8.add_field(
+        name="3️⃣ Give them their own identity",
+        value=(
+            "`!license identity <guild> tag ALLY name \"Ally Faction\" display \"ALLY Moderation\"`\n"
+            "The bot's NICKNAME changes per server and embed footers rebrand there "
+            "automatically. The global gang name and presence stay yours."
+        ),
+        inline=False,
+    )
+    e8.add_field(
+        name="4️⃣ Keep control",
+        value=(
+            "• `!license suspend` / `resume` / `revoke` — instant off-switches\n"
+            "• `!license expiry <guild> 30d` — time-limited licenses that auto-suspend\n"
+            "• `!license authority add @user` — share license authority without giving "
+            "up the bot (stored in settings, never hardcoded)\n"
+            "• `!license audit` — every action on record\n"
+            "• Allied leaders reach you with `!request` (rate-limited)\n\n"
+            "_Default-deny: any command not in a granted bundle is home-only, and "
+            "home-config automations (welcome messages, blacklist scans) never run "
+            "in allied servers._"
+        ),
+        inline=False,
+    )
+    e8.set_footer(text=f"Page 8/8 • FactionAccess — you stay in control.")
+    embeds.append(e8)
 
     return embeds
 
@@ -5600,6 +5750,17 @@ async def on_ready() -> None:
     # guild-dependent work that needs bot.guilds to be fully cached.
     # -----------------------------------------------------------------------
     _on_ready_initialized = True
+
+    # --- FACTIONACCESS ON_READY HOOK ---
+    # Classifies every command into its feature bundle, adopts the home
+    # guild when no explicit setting exists, registers pre-existing
+    # guilds as pending, applies per-guild identity nicknames and starts
+    # the license-expiry sweeper. Must run BEFORE any command can be
+    # answered in an allied guild.
+    try:
+        FactionAccess.wiring.on_ready_hook(bot)
+    except Exception as exc:
+        logging.exception(f"[on_ready] FactionAccess.on_ready_hook failed: {exc}")
 
     if _is_lead_instance() and ows_get("first_startup_tutorial"):
         await send_owner_tutorial(force=False)
@@ -5797,6 +5958,17 @@ async def on_ready() -> None:
 
 @bot.event
 async def on_member_join(member: discord.Member) -> None:
+    # --- FACTIONACCESS AUTOMATION SCOPE ---
+    # Automated join behaviors (blacklist auto-ban, welcome message,
+    # sticky-role restore) are bound to the home faction's global
+    # channel/role config, so they stay HOME-GUILD-ONLY in the
+    # multi-guild model. Allied factions get the systems they were
+    # granted via commands (which carry their own per-guild config),
+    # never unsolicited home-config automation.
+    _fa = getattr(bot, 'faction_access', None)
+    if _fa is not None and not _fa.is_home(member.guild.id):
+        return
+
     # Domain split: moderation bots handle the blacklist auto-ban; utility
     # bots handle welcome messages + sticky roles. (Full bot: both.)
     if instance_handles('mod'):
@@ -5848,6 +6020,12 @@ async def on_presence_update(before: discord.Member, after: discord.Member) -> N
     if not instance_handles('mod'):
         return
     if after.bot:
+        return
+    # --- FACTIONACCESS AUTOMATION SCOPE ---
+    # The blacklist presence scan uses the home faction's global keyword
+    # list — it never extends into allied guilds.
+    _fa = getattr(bot, 'faction_access', None)
+    if _fa is not None and not _fa.is_home(after.guild.id):
         return
     if not blacklisted_keywords:
         return
@@ -6583,6 +6761,21 @@ async def on_message(message: discord.Message) -> None:
     if message.author.bot:
         return
 
+    # --- FACTIONACCESS AUTOMATION SCOPE ---
+    # Non-command automations must respect multi-guild licensing:
+    #   * home-guild-only automations (blacklist scans, message-log
+    #     caching, premium custom-command dispatch) — they read the
+    #     home faction's global config;
+    #   * bundle-following automations (leveling XP, handled inside the
+    #     leveling cog's own listener) — the data is per-guild, so they
+    #     run wherever the bundle is granted.
+    # A missing service (pre-setup_hook) keeps the legacy behavior.
+    _fa = getattr(bot, 'faction_access', None)
+    _fa_home = (_fa is None or message.guild is None
+                or _fa.automation_allowed(message.guild.id, None))
+    _fa_tickets = (_fa is None or message.guild is None
+                   or _fa.automation_allowed(message.guild.id, 'tickets'))
+
     # --- VERIFICATION CHANNEL AUTO-PURGE HOOK ---
     # Any human message in the verification channel counts as activity: it
     # cancels any in-progress purge countdown (during the 2-minute warning
@@ -6616,7 +6809,8 @@ async def on_message(message: discord.Message) -> None:
     # channels, where staff would otherwise be auto-banned for discussing a
     # blacklisted keyword.
     _ticket_exempt = any_ticket is not None and not ows_get("blacklist_in_tickets")
-    if instance_handles('mod') and message.guild and blacklisted_keywords and not _ticket_exempt and ows_get("auto_ban_message"):
+    if (instance_handles('mod') and message.guild and blacklisted_keywords
+            and not _ticket_exempt and ows_get("auto_ban_message") and _fa_home):
         content = message.content or ""
         if not content.startswith(config.command_prefix):
             found, keyword = check_text_for_keywords(content)
@@ -6665,7 +6859,7 @@ async def on_message(message: discord.Message) -> None:
 
 
     try:
-        if instance_handles('mod') and message.guild is not None:
+        if instance_handles('mod') and message.guild is not None and _fa_home:
             MessageLogSystem.cache(message)
     except Exception as exc:
         logging.debug(f"[MsgLog] on_message cache failed: {exc}")
@@ -6761,7 +6955,7 @@ async def on_message(message: discord.Message) -> None:
     # --- PREMIUM TIER 2: custom command prefix dispatch ---
     # If the message is a !-prefixed command that isn't a built-in, check if
     # it's a custom command. If it ran, we're done (skip multi-command parsing).
-    if instance_handles('ticket') and PREMIUM_AVAILABLE and message.guild and message.content:
+    if instance_handles('ticket') and PREMIUM_AVAILABLE and message.guild and message.content and _fa_tickets:
         try:
             content = message.content.strip()
             if content.startswith(config.command_prefix):
@@ -13117,14 +13311,17 @@ def main() -> None:
         print("Put your Discord bot token in one of these files:")
         print("  • .env          (project root)  ->  BOT_TOKEN=your-token")
         print("  • tokens.txt    (project root)  ->  BOT_Token=your-token")
+        print("Tip: the committed .env.example is a ready-to-copy template:")
+        print("  cp .env.example .env")
         print("Then run:  python src/bot.py")
         print("=" * 60)
         logging.error("Bot token not found.")
         exit(1)
 
-    print("=" * 50)
-    print(f"{config.gang_name} BOT - Starting (By IdkAnymore_039)")
-    print("=" * 50)
+    print("=" * 60)
+    print(f"FactionBot {EDITION} Edition v{__version__} — starting")
+    print(f"Configured for: {config.gang_name} (By IdkAnymore_039)")
+    print("=" * 60)
     try:
         bot.run(token)
     except (discord.LoginFailure, discord.HTTPException) as exc:

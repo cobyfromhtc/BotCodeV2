@@ -91,12 +91,15 @@ from core.domains import (
     resolve_custom_domains,
 )
 
-# Aligned with CHANGELOG.md (Round 4 = the SaaS package split).
-__version__ = "4.0.0"
+# Aligned with docs/CHANGELOG.md (Round 4 = the SaaS package split,
+# Round 5 = the SaaS quality pass, Round 6 = FactionAccess multi-guild
+# licensing: !license / !request, per-guild identity, feature-bundle gating).
+EDITION = "Full"
+__version__ = "4.2.0"
 
 __all__ = [
     # package surface
-    "__version__", "state",
+    "__version__", "EDITION", "state",
     # paths — filesystem anchors
     "_HERE", "_PROJECT_ROOT", "_SRC_ROOT", "_DATA_DIR",
     # environment (from config.environment)

@@ -707,10 +707,23 @@ def _json_dumps(value) -> str:
 
 
 def _json_loads_list(raw: Optional[str]) -> List:
+    """Parse a JSON list column, tolerating the empty/null common cases.
+
+    Fast-paths the two values we see most (`''` and `'[]'`) so the
+    `json.loads` call — and the surrounding isinstance checks — only run
+    when the string could actually contain JSON.
+    """
     if not raw:
         return []
+    stripped = raw.strip() if isinstance(raw, str) else raw
+    if stripped == '' or stripped == '[]':
+        return []
+    # Only bother parsing if the string looks like a list or a quoted
+    # string (the latter handles rows written double-encoded).
+    if not isinstance(stripped, str) or not (stripped.startswith('[') or stripped.startswith('"')):
+        return []
     try:
-        data = json.loads(raw)
+        data = json.loads(stripped)
         if isinstance(data, str):
             # Self-heal rows written double-encoded (see _json_dumps).
             data = json.loads(data)
@@ -720,10 +733,19 @@ def _json_loads_list(raw: Optional[str]) -> List:
 
 
 def _json_loads_dict(raw: Optional[str]) -> Dict:
+    """Parse a JSON object column, tolerating the empty/null common cases.
+
+    Same fast-path strategy as `_json_loads_list`.
+    """
     if not raw:
         return {}
+    stripped = raw.strip() if isinstance(raw, str) else raw
+    if stripped == '' or stripped == '{}':
+        return {}
+    if not isinstance(stripped, str) or not (stripped.startswith('{') or stripped.startswith('"')):
+        return {}
     try:
-        data = json.loads(raw)
+        data = json.loads(stripped)
         if isinstance(data, str):
             # Self-heal rows written double-encoded (see _json_dumps).
             data = json.loads(data)

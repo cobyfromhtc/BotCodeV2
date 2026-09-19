@@ -316,7 +316,6 @@ class FlowStepView(View):
     async def _submit(self, interaction: discord.Interaction,
                       answer: str) -> None:
         # Record the answer + advance.
-        from . import wiring as W  # noqa: F401  (keeps import order stable)
         bot = interaction.client
         pdb = getattr(bot, 'premium_db', None)
         if pdb is None:
