@@ -1,0 +1,61 @@
+2026-09-18 08:29:48,311 - INFO - [Startup] Logging configured — beginning bot initialization...
+2026-09-18 08:29:49,410 - WARNING - PyNaCl is not installed, voice will NOT be supported
+2026-09-18 08:29:49,410 - WARNING - davey is not installed, voice will NOT be supported
+2026-09-18 08:29:49,423 - INFO - [tickettool.commands] registered Tier 1 + Tier 2 + Tier 3 prefix commands
+2026-09-18 08:29:49,423 - INFO - [TicketTool] registered prefix commands (inline)
+2026-09-18 08:29:49,424 - INFO - [ReactionRoles] registered rr prefix group + 5 subcommands
+2026-09-18 08:29:49,424 - INFO - [ReactionRoles] registered prefix commands (inline)
+2026-09-18 08:29:49,428 - INFO - [Modules] registered modules.administration.owner (53 commands total)
+2026-09-18 08:29:49,462 - INFO - [Modules] registered modules.administration.setup (61 commands total)
+2026-09-18 08:29:49,462 - INFO - [Modules] registered modules.verification.verification (64 commands total)
+2026-09-18 08:29:49,534 - INFO - [Modules] registered modules.support.tickets (105 commands total)
+2026-09-18 08:29:49,537 - INFO - [Modules] registered modules.moderation.moderation (129 commands total)
+2026-09-18 08:29:49,539 - INFO - [Modules] registered modules.factions.rules (134 commands total)
+2026-09-18 08:29:49,540 - INFO - [Modules] registered modules.administration.channels (136 commands total)
+2026-09-18 08:29:49,540 - INFO - [Modules] registered modules.engagement.giveaways (138 commands total)
+2026-09-18 08:29:49,541 - INFO - [Modules] registered modules.engagement.leveling (140 commands total)
+2026-09-18 08:29:49,541 - INFO - [Modules] registered modules.engagement.invites (144 commands total)
+2026-09-18 08:29:49,584 - INFO - [Modules] registered modules.engagement.polls (145 commands total)
+2026-09-18 08:29:49,585 - INFO - [Modules] registered modules.support.info (152 commands total)
+2026-09-18 08:29:49,586 - INFO - [Modules] registered modules.moderation.sticky_roles (153 commands total)
+2026-09-18 08:29:49,588 - INFO - [Modules] registered modules.moderation.msglog (154 commands total)
+2026-09-18 08:29:49,620 - INFO - [Modules] registered modules.administration.branding (155 commands total)
+2026-09-18 08:29:49,650 - INFO - [Modules] registered modules.administration.admin (159 commands total)
+2026-09-18 08:29:49,650 - INFO - [Modules] registered lifecycle event handlers
+2026-09-18 08:29:49,653 - INFO - logging in using static token
+2026-09-18 08:29:50,357 - INFO - [DataManager] Connected to database: c:\Users\User\Desktop\BotProjects\FactionBotV2_SaaS_ZAI\FullVersion\src\data\bot_data.db
+2026-09-18 08:29:55,364 - WARNING - [OWS] use_bot_status apply error: 
+2026-09-18 08:29:55,366 - INFO - [OWS] Hydrated 70 owner settings — 58/70 enabled
+2026-09-18 08:29:55,367 - INFO - [Blacklist] Loaded 0 blacklisted keywords from SQLite
+2026-09-18 08:29:55,427 - INFO - [RulesCache] Loaded cached rules from SQLite
+2026-09-18 08:29:55,427 - INFO - [Giveaways] Loaded 0 giveaway(s) from SQLite
+2026-09-18 08:29:55,428 - INFO - [Levels] Loaded 2 user levels from SQLite
+2026-09-18 08:29:55,429 - INFO - [Import] No JSON files found to import
+2026-09-18 08:29:55,430 - INFO - [SetupHook] One-time initialization complete (DB + caches + generic views)
+2026-09-18 08:29:55,432 - INFO - [tickettool.db] Tier 1 + Tier 2 + Tier 3 schema installed (idempotent).
+2026-09-18 08:29:55,432 - INFO - [tickettool.wiring] schema installed + premium_db attached
+2026-09-18 08:29:55,433 - INFO - [ReactionRoles] global refs set
+2026-09-18 08:29:55,433 - INFO - [reactionroles.wiring] schema installed + reaction_roles_db attached
+2026-09-18 08:29:55,438 - WARNING - [Presence] Could not apply bot status: 'NoneType' object has no attribute 'change_presence'
+2026-09-18 08:29:56,042 - INFO - Shard ID None has connected to Gateway (Session ID: d93216b17d3b641710ef0ecef82833c7).
+2026-09-18 08:29:58,078 - INFO - Bot started as The Lakaka Mafia (VPRP)
+2026-09-18 08:29:58,943 - WARNING - [Tutorial] Owner has DMs closed; cannot send tutorial page 1.
+2026-09-18 08:29:58,943 - WARNING - [Tutorial] No tutorial pages were delivered. Owner DMs may be closed.
+2026-09-18 08:29:58,943 - INFO - [InviteManager] Loaded 24 tracked invites from SQLite
+2026-09-18 08:29:58,944 - INFO - [TicketTool] Initialized ticket tool system
+2026-09-18 08:29:58,949 - INFO - [tickettool.wiring] on_ready hook complete
+2026-09-18 08:29:58,949 - INFO - [TicketTool] Registered views for panels
+2026-09-18 08:29:58,950 - INFO - [TicketTool] Registered views for multi-panels
+2026-09-18 08:29:59,349 - WARNING - [GetAllRoles] Could not refresh message 1541098338697609348 on startup: 403 Forbidden (error code: 50005): Cannot edit a message authored by another user
+2026-09-18 08:29:59,349 - INFO - [Blacklist] Started scheduled auto-scan task
+2026-09-18 08:29:59,350 - INFO - [Premium] (VPRP) 𝐁𝐎𝐑𝐍 𝐓𝐎 𝐊𝐈𝐋𝐋 #𝐑𝐄𝐀𝐋: RR=0/250 sticky=off msglog=on branding_footer=set
+2026-09-18 08:30:17,057 - INFO - cobydaone purged all (2) messages in 𝑪𝑶𝑴𝑴𝑨𝑵𝑫𝑺
+2026-09-18 10:26:54,875 - INFO - Shard ID None has successfully RESUMED session d93216b17d3b641710ef0ecef82833c7.
+2026-09-18 13:02:18,416 - INFO - Shard ID None has successfully RESUMED session d93216b17d3b641710ef0ecef82833c7.
+2026-09-18 14:57:33,194 - INFO - Shard ID None has successfully RESUMED session d93216b17d3b641710ef0ecef82833c7.
+2026-09-18 16:42:46,376 - INFO - Shard ID None has successfully RESUMED session d93216b17d3b641710ef0ecef82833c7.
+2026-09-18 17:02:49,053 - INFO - Shard ID None has successfully RESUMED session d93216b17d3b641710ef0ecef82833c7.
+2026-09-18 17:44:49,376 - INFO - Shard ID None has successfully RESUMED session d93216b17d3b641710ef0ecef82833c7.
+2026-09-18 17:59:18,029 - INFO - Shard ID None has successfully RESUMED session d93216b17d3b641710ef0ecef82833c7.
+2026-09-18 18:21:49,197 - INFO - Shard ID None has successfully RESUMED session d93216b17d3b641710ef0ecef82833c7.
+2026-09-18 21:54:52,517 - INFO - Shard ID None has successfully RESUMED session d93216b17d3b641710ef0ecef82833c7.

@@ -1,0 +1,35 @@
+{
+  "_comment": "Canonical emoji catalog for FactionBot. Mirrors the constants used in code (ticket priority colors live next to them in the views modules). Use this file when re-theming the bot.",
+  "ticket_priority": {
+    "low": "\ud83d\udfe2",
+    "normal": "\ud83d\udd35",
+    "high": "\ud83d\udfe0",
+    "urgent": "\ud83d\udd34"
+  },
+  "status": {
+    "success": "\u2705",
+    "error": "\u274c",
+    "warning": "\u26a0\ufe0f",
+    "info": "\u2139\ufe0f",
+    "neutral": "\ud83d\udcac"
+  },
+  "tickets": {
+    "open": "\ud83c\udf9f\ufe0f",
+    "close": "\ud83d\udd12",
+    "claim": "\ud83d\udc64",
+    "transcript": "\ud83d\udcc4",
+    "rating_star": "\u2b50"
+  },
+  "verification": {
+    "pending": "\u23f3",
+    "approved": "\ud83c\udd97",
+    "denied": "\u274e",
+    "appeal": "\ud83d\udce9"
+  },
+  "moderation": {
+    "muted": "\ud83d\udd07",
+    "banned": "\ud83d\udeab",
+    "warned": "\u26a0",
+    "report": "\ud83d\udc41\ufe0f"
+  }
+}
